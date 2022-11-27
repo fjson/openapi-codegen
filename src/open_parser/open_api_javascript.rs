@@ -52,7 +52,11 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_> {
                     api_list.push((
                         module.to_string(),
                         OpenApiResquest {
-                            summary: api_config.summary.to_string(),
+                            summary: if let Some(summary) = &api_config.summary {
+                                summary.to_string()
+                            } else {
+                                String::new()
+                            },
                             method,
                             operation_id: operation_id.to_string(),
                             url: url.to_string(),

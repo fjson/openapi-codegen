@@ -61,7 +61,7 @@ pub struct Open3ApiConfig {
     #[serde(alias = "requestBody")]
     pub request_body: Option<Open3RequestBody>,
 
-    pub summary: String,
+    pub summary: Option<String>,
 
     pub tags: Vec<String>,
 }
