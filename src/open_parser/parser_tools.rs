@@ -12,6 +12,8 @@ pub struct OpenApiResquest {
     /// 请求方式 目前支持 get post delete put
     pub method: String,
 
+    pub request_schema_name: String,
+
     /// 请求参数类型
     /// 无论post 或 get 都将生成唯一的类型
     pub request_type_name: String,

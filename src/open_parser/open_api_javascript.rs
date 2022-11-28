@@ -12,7 +12,7 @@ pub trait OpenApiJavaScriptParser {
     fn get_module_list(&self) -> Vec<OpenApiModule>;
 
     /// 返回api列表
-    fn get_api_list(&self) -> Vec<(String, OpenApiResquest)>;
+    fn get_api_list(&self) -> &Vec<(String, OpenApiResquest)>;
 
     /// 获取类型列表
     fn get_interface_enum_list(&self, ignore_option: &bool) -> Vec<String>;
@@ -20,11 +20,15 @@ pub trait OpenApiJavaScriptParser {
 
 pub struct OpenApi3JavaScript<'a> {
     config: &'a Open3Config,
+    api_list: Vec<(String, OpenApiResquest)>,
 }
 
 impl<'a> OpenApi3JavaScript<'a> {
     pub fn new(config: &'a Open3Config) -> OpenApi3JavaScript<'a> {
-        OpenApi3JavaScript { config }
+        OpenApi3JavaScript {
+            config,
+            api_list: open_3_get_api_list(config),
+        }
     }
 }
 
@@ -40,38 +44,8 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_> {
             .collect()
     }
 
-    fn get_api_list(&self) -> Vec<(String, OpenApiResquest)> {
-        let mut paths_vec: Vec<(&String, &Open3Requests)> = self.config.paths.iter().collect();
-        paths_vec.sort_by(|a, b| a.0.cmp(b.0));
-        let mut api_list: Vec<(String, OpenApiResquest)> = vec![];
-        for (url, requests) in paths_vec {
-            for (method, request) in requests.iter() {
-                if let Some(api_config) = request {
-                    let module = &api_config.tags[0];
-                    let operation_id = &api_config.operation_id;
-                    api_list.push((
-                        module.to_string(),
-                        OpenApiResquest {
-                            summary: if let Some(summary) = &api_config.summary {
-                                summary.to_string()
-                            } else {
-                                String::new()
-                            },
-                            method,
-                            operation_id: operation_id.to_string(),
-                            url: url.to_string(),
-                            request_type_name: open_3_get_request_type_name(
-                                &self.config,
-                                &api_config,
-                            ),
-                            content_type: String::from("application/json"),
-                            response_type_name: open_3_get_response_type_name(&api_config),
-                        },
-                    ))
-                }
-            }
-        }
-        api_list
+    fn get_api_list(&self) -> &Vec<(String, OpenApiResquest)> {
+        &self.api_list
     }
 
     fn get_interface_enum_list(&self, ignore_option: &bool) -> Vec<String> {
@@ -81,8 +55,18 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_> {
             self.config.components.schemas.iter().collect();
         components_schema_vec.sort_by(|a, b| a.0.cmp(&b.0));
 
+        let request_scheme_name_vec: Vec<&String> = self
+            .api_list
+            .iter()
+            .map(|v| &v.1.request_schema_name)
+            .collect();
+
         for (_, schema) in components_schema_vec {
-            str_vec.push(open_3_create_ts_interface_enum(schema, ignore_option));
+            str_vec.push(open_3_create_ts_interface_enum(
+                schema,
+                &request_scheme_name_vec,
+                ignore_option,
+            ));
         }
         str_vec
     }
@@ -119,6 +103,39 @@ pub fn ts_data_type_translate(data_type: &str) -> String {
     }
 }
 
+fn open_3_get_api_list(config: &Open3Config) -> Vec<(String, OpenApiResquest)> {
+    let mut paths_vec: Vec<(&String, &Open3Requests)> = config.paths.iter().collect();
+    paths_vec.sort_by(|a, b| a.0.cmp(b.0));
+    let mut api_list: Vec<(String, OpenApiResquest)> = vec![];
+    for (url, requests) in paths_vec {
+        for (method, request) in requests.iter() {
+            if let Some(api_config) = request {
+                let module = &api_config.tags[0];
+                let operation_id = &api_config.operation_id;
+                let request_type = open_3_get_request_type_name(&config, &api_config);
+                api_list.push((
+                    module.to_string(),
+                    OpenApiResquest {
+                        summary: if let Some(summary) = &api_config.summary {
+                            summary.to_string()
+                        } else {
+                            String::new()
+                        },
+                        method,
+                        operation_id: operation_id.to_string(),
+                        url: url.to_string(),
+                        request_schema_name: request_type.0,
+                        request_type_name: request_type.1,
+                        content_type: String::from("application/json"),
+                        response_type_name: open_3_get_response_type_name(&api_config),
+                    },
+                ))
+            }
+        }
+    }
+    api_list
+}
+
 /// 获取响应类型名称
 fn open_3_get_response_type_name(api_config: &Open3ApiConfig) -> String {
     if let Some(response_content_map) = api_config
@@ -137,7 +154,10 @@ fn open_3_get_response_type_name(api_config: &Open3ApiConfig) -> String {
 }
 
 /// 获取请求参数类型名称
-fn open_3_get_request_type_name(open_config: &Open3Config, api_config: &Open3ApiConfig) -> String {
+fn open_3_get_request_type_name(
+    open_config: &Open3Config,
+    api_config: &Open3ApiConfig,
+) -> (String, String) {
     if let Some(schema_ref) = api_config
         .request_body
         .as_ref()
@@ -145,15 +165,21 @@ fn open_3_get_request_type_name(open_config: &Open3Config, api_config: &Open3Api
         .and_then(|x| x.schema.schema_ref.as_ref())
     {
         let is_required = open_3_schema_is_required(open_config, schema_ref);
-        let mut type_name = open_3_get_type_name_from_schema_ref(schema_ref);
+        let type_name = open_3_get_type_name_from_schema_ref(schema_ref);
+        let mut type_name_clone = type_name.clone();
         if !type_name.eq("void") {
-            if !is_required {
-                type_name.push_str(" | void");
-            }
-            return type_name;
+            return (
+                type_name,
+                if !is_required {
+                    type_name_clone.push_str(" | void");
+                    type_name_clone
+                } else {
+                    type_name_clone
+                },
+            );
         }
     }
-    String::from("void")
+    (String::from("void"), String::from("void"))
 }
 
 /// 根据schema生成响应类型名称
@@ -215,10 +241,11 @@ fn open_3_schema_is_required(open_config: &Open3Config, scheme_ref: &str) -> boo
 /// 生成typescript interface类型
 fn open_3_create_ts_interface_enum(
     components_schema: &Open3ComponentsSchema,
+    request_type_name_vec: &Vec<&String>,
     ignore_option: &bool,
 ) -> String {
-    let title = open_3_get_type_name_from_schema_ref(&components_schema.title);
-    let mut interface_str = format!("interface {} {{", &title);
+    let interface_name = open_3_get_type_name_from_schema_ref(&components_schema.title);
+    let mut interface_str = format!("interface {} {{", &interface_name);
 
     let mut open_api_schema_vec: Vec<(&String, &Open3Schema)> =
         components_schema.properties.iter().collect();
@@ -231,8 +258,11 @@ fn open_3_create_ts_interface_enum(
         &required_default_vec
     };
 
+    let is_request_name_interface = request_type_name_vec.contains(&&interface_name);
+    let ignore_option = !is_request_name_interface && *ignore_option;
+
     for (property_name, property) in open_api_schema_vec {
-        let property_option_split = if *ignore_option || required_vec.contains(property_name) {
+        let property_option_split = if ignore_option || required_vec.contains(property_name) {
             ""
         } else {
             "?"
@@ -248,7 +278,7 @@ fn open_3_create_ts_interface_enum(
   /**
    * {description}
    * @type {schema_type}
-   * @memberof {title}
+   * @memberof {interface_name}
    */
   {property_name}{property_option_split}: {schema_type};"
         );

@@ -87,7 +87,7 @@ fn create_controller(
     let mut file_touched_record_map = HashMap::new();
 
     for (module, request) in open_api_parser.get_api_list() {
-        if let Some(module_path) = module_path_map.get(&module) {
+        if let Some(module_path) = module_path_map.get(module) {
             let operation_id = &request.operation_id;
             info!("generate call {}  ", operation_id);
             let api_template = create_api_call(&request);
