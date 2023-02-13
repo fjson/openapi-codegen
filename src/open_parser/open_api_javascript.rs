@@ -1,4 +1,4 @@
-use super::parser_tools::{OpenApiModule, OpenApiResquest};
+use super::parser_tools::{OpenApiModule, OpenApiRequester};
 use crate::open_api::open_api_3::{
     Open3ApiConfig, Open3ComponentsSchema, Open3Config, Open3Requests, Open3Schema,
 };
@@ -12,22 +12,25 @@ pub trait OpenApiJavaScriptParser {
     fn get_module_list(&self) -> Vec<OpenApiModule>;
 
     /// 返回api列表
-    fn get_api_list(&self) -> &Vec<(String, OpenApiResquest)>;
+    fn get_api_list(&self) -> &Vec<(String, OpenApiRequester)>;
 
     /// 获取类型列表
     fn get_interface_enum_list(&self, ignore_option: &bool) -> Vec<String>;
 }
 
 pub struct OpenApi3JavaScript<'a> {
-    config: &'a Open3Config,
-    api_list: Vec<(String, OpenApiResquest)>,
+    config: &'a mut Open3Config,
+    api_list: Vec<(String, OpenApiRequester)>,
 }
 
 impl<'a> OpenApi3JavaScript<'a> {
-    pub fn new(config: &'a Open3Config) -> OpenApi3JavaScript<'a> {
+    pub fn new(config: &'a mut Open3Config) -> OpenApi3JavaScript<'a> {
+        let api_list = {
+            open_3_get_api_list(config)
+        };
         OpenApi3JavaScript {
             config,
-            api_list: open_3_get_api_list(config),
+            api_list,
         }
     }
 }
@@ -44,7 +47,7 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_> {
             .collect()
     }
 
-    fn get_api_list(&self) -> &Vec<(String, OpenApiResquest)> {
+    fn get_api_list(&self) -> &Vec<(String, OpenApiRequester)> {
         &self.api_list
     }
 
@@ -72,8 +75,8 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_> {
     }
 }
 
-/// 支持将open api类型转成ts对应的类型
-pub fn ts_data_type_translate(data_type: &str) -> String {
+/// 将open api类型转成ts对应的类型
+pub fn ts_type_translate(data_type: &str) -> String {
     lazy_static! {
         static ref JS_TYPE_MAP: HashMap<&'static str, &'static str> = {
             let mut m = HashMap::new();
@@ -103,10 +106,16 @@ pub fn ts_data_type_translate(data_type: &str) -> String {
     }
 }
 
-fn open_3_get_api_list(config: &Open3Config) -> Vec<(String, OpenApiResquest)> {
+/// 目前Get请求参数处理是有问题的
+///
+/// 可通过以下方式扩展对get的支持
+/// 
+/// - 1、指定request type name
+/// - 2、向components里面追加新的Schema
+fn open_3_get_api_list(config: &mut Open3Config) -> Vec<(String, OpenApiRequester)> {
     let mut paths_vec: Vec<(&String, &Open3Requests)> = config.paths.iter().collect();
     paths_vec.sort_by(|a, b| a.0.cmp(b.0));
-    let mut api_list: Vec<(String, OpenApiResquest)> = vec![];
+    let mut api_list: Vec<(String, OpenApiRequester)> = vec![];
     for (url, requests) in paths_vec {
         for (method, request) in requests.iter() {
             if let Some(api_config) = request {
@@ -115,7 +124,7 @@ fn open_3_get_api_list(config: &Open3Config) -> Vec<(String, OpenApiResquest)> {
                 let request_type = open_3_get_request_type_name(&config, &api_config);
                 api_list.push((
                     module.to_string(),
-                    OpenApiResquest {
+                    OpenApiRequester {
                         summary: if let Some(summary) = &api_config.summary {
                             summary.to_string()
                         } else {
@@ -200,7 +209,7 @@ fn open_3_get_type_name_from_schema(schema: &Open3Schema, generic: &str) -> Stri
         if schema_type.eq("array") {
             return open_3_get_type_name_from_schema(schema.items.as_ref().unwrap(), "Array<T>");
         }
-        return ts_data_type_translate(&schema_type.clone());
+        return ts_type_translate(&schema_type.clone());
     }
     String::from("void")
 }

@@ -9,7 +9,7 @@ use crate::{
     command_config::CommandConfig,
     open_parser::{
         open_api_javascript::OpenApiJavaScriptParser,
-        parser_tools::{OpenApiModule, OpenApiResquest},
+        parser_tools::{OpenApiModule, OpenApiRequester},
     },
 };
 
@@ -213,7 +213,7 @@ export * from './{controller_dir_name}/{module}';
 }
 
 /// 生成api调用
-fn create_api_call(open_api_request: &OpenApiResquest) -> String {
+fn create_api_call(open_api_request: &OpenApiRequester) -> String {
     // 接口调用名
     let operation_id = &open_api_request.operation_id;
     // 接口说明

@@ -18,13 +18,13 @@ async fn main() {
 
     let start = Instant::now();
     // 获取open api 配置文件内容
-    let open_config = tools::http_request::get(&command_config.open_config_path)
+    let mut open_config = tools::http_request::get(&command_config.open_config_path)
         .await
         .expect("open api config get error");
     println!("get config use time: {}ms", start.elapsed().as_millis());
 
     // 生成 typescript open api 调用
     let start = Instant::now();
-    ts_generator::create_typescript_api(&command_config, &OpenApi3JavaScript::new(&open_config));
+    ts_generator::create_typescript_api(&command_config, &OpenApi3JavaScript::new(&mut open_config));
     println!("generate use time: {}ms", start.elapsed().as_millis());
 }
