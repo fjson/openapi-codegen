@@ -25,6 +25,6 @@ async fn main() {
 
     // 生成 typescript open api 调用
     let start = Instant::now();
-    ts_generator::create_typescript_api(&command_config, &OpenApi3JavaScript::new(&mut open_config));
+    ts_generator::create_typescript_api(&command_config, &OpenApi3JavaScript::new(&mut open_config, &command_config));
     println!("generate use time: {}ms", start.elapsed().as_millis());
 }

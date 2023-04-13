@@ -10,7 +10,8 @@
 - -o required output dir
 - -s split module file
 - -i ignore response field option
+- --tags special tag(split with ,)
 
 ```bash
-open-api-codegen -c <json config url> -o <output dir> -s <split file> -i <ignore option>
+open-api-codegen -c <json config url> -o <output dir> -s <split file> -i <ignore option> --tags <tag>
 ```

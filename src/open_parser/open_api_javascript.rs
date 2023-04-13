@@ -1,7 +1,7 @@
 use super::parser_tools::{OpenApiModule, OpenApiRequester};
-use crate::open_api::open_api_3::{
+use crate::{open_api::open_api_3::{
     Open3ApiConfig, Open3ComponentsSchema, Open3Config, Open3Requests, Open3Schema,
-};
+}, command_config::{CommandConfig}};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::HashMap;
@@ -9,7 +9,7 @@ use std::collections::HashMap;
 pub trait OpenApiJavaScriptParser {
     /// 获取模块列表
     /// 可利用模块列表生成模块文件或文件夹对接口进行分类
-    fn get_module_list(&self) -> Vec<OpenApiModule>;
+    fn get_module_list(&self, command_config:&CommandConfig) -> Vec<OpenApiModule>;
 
     /// 返回api列表
     fn get_api_list(&self) -> &Vec<(String, OpenApiRequester)>;
@@ -24,10 +24,8 @@ pub struct OpenApi3JavaScript<'a> {
 }
 
 impl<'a> OpenApi3JavaScript<'a> {
-    pub fn new(config: &'a mut Open3Config) -> OpenApi3JavaScript<'a> {
-        let api_list = {
-            open_3_get_api_list(config)
-        };
+    pub fn new(config: &'a mut Open3Config, command_config:&CommandConfig) -> OpenApi3JavaScript<'a> {
+        let api_list = open_3_get_api_list(config, command_config);
         OpenApi3JavaScript {
             config,
             api_list,
@@ -36,13 +34,22 @@ impl<'a> OpenApi3JavaScript<'a> {
 }
 
 impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_> {
-    fn get_module_list(&self) -> Vec<OpenApiModule> {
+    fn get_module_list(&self, command_config:&CommandConfig) -> Vec<OpenApiModule> {
         self.config
             .tags
             .iter()
-            .map(|v| OpenApiModule {
-                description: v.description.to_string(),
-                name: v.name.to_string(),
+            .filter_map(|v| {
+                let name = v.name.to_string();
+                if !command_config.tags.is_empty() && !command_config.tags.contains(&name) {
+                    None
+                }else {
+                    Some(
+                        OpenApiModule {
+                            description: v.description.to_string(),
+                            name: v.name.to_string(),
+                        }
+                    )
+                }
             })
             .collect()
     }
@@ -81,6 +88,7 @@ pub fn ts_type_translate(data_type: &str) -> String {
         static ref JS_TYPE_MAP: HashMap<&'static str, &'static str> = {
             let mut m = HashMap::new();
             m.insert("array", "Array");
+            m.insert("number", "number");
             m.insert("int", "number");
             m.insert("integer", "number");
             m.insert("double", "number");
@@ -112,7 +120,7 @@ pub fn ts_type_translate(data_type: &str) -> String {
 /// 
 /// - 1、指定request type name
 /// - 2、向components里面追加新的Schema
-fn open_3_get_api_list(config: &mut Open3Config) -> Vec<(String, OpenApiRequester)> {
+fn open_3_get_api_list(config: &mut Open3Config,  command_config:&CommandConfig) -> Vec<(String, OpenApiRequester)> {
     let mut paths_vec: Vec<(&String, &Open3Requests)> = config.paths.iter().collect();
     paths_vec.sort_by(|a, b| a.0.cmp(b.0));
     let mut api_list: Vec<(String, OpenApiRequester)> = vec![];
@@ -122,6 +130,12 @@ fn open_3_get_api_list(config: &mut Open3Config) -> Vec<(String, OpenApiRequeste
                 let module = &api_config.tags[0];
                 let operation_id = &api_config.operation_id;
                 let request_type = open_3_get_request_type_name(&config, &api_config);
+                // 如果已经指定了tag， 则忽略其他tag
+                if !command_config.tags.is_empty() {
+                    if !command_config.tags.contains(&module) {
+                        continue;
+                    }
+                }
                 api_list.push((
                     module.to_string(),
                     OpenApiRequester {

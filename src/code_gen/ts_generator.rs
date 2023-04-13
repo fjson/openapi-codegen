@@ -49,7 +49,7 @@ pub fn create_entry_file(
         .expect("cannot open entry file");
 
     // 写入入口文件内容
-    for module in open_api_parser.get_module_list() {
+    for module in open_api_parser.get_module_list(command_config) {
         let write_content =
             create_entry_export_template(&command_config.controller_dir_name, &module);
         f.write_all(write_content.as_bytes())
@@ -69,7 +69,7 @@ fn create_controller(
     // 存储所有的路径
     let mut module_path_map = HashMap::new();
 
-    for module in open_api_parser.get_module_list() {
+    for module in open_api_parser.get_module_list(command_config) {
         let module_dir_path = controller_dir_path.as_path().join(&module.name);
         if let Some(module_dir_path) = module_dir_path.to_str() {
             module_path_map.insert(module.name, String::from(module_dir_path));
@@ -220,19 +220,21 @@ fn create_api_call(open_api_request: &OpenApiRequester) -> String {
     let summary = &open_api_request.summary;
     // 响应类型
     let response_type = &open_api_request.response_type_name;
-
     let request_type = &open_api_request.request_type_name;
-
     let method = &open_api_request.method;
-
     let api_url = &open_api_request.url;
+    let method_name = if summary.starts_with("[No Auth]") {
+        format!("{method}NoAuth")
+    }else {
+        method.to_string()
+    };
     format!(
         r#"
 /**
  * {summary}
  */
 export function {operation_id}(req:{request_type}, config?: RequestConfig): Promise<{response_type}> {{
-    return resource.{method}("{api_url}", req, config);
+    return resource.{method_name}("{api_url}", req, config);
 }}
     "#
     )
