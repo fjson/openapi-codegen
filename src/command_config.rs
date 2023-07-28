@@ -7,7 +7,7 @@ pub struct CommandConfig {
     pub open_config_path: String,
     pub controller_dir_name: String,
     pub ignore_option: bool,
-    pub tags:Vec<String>,
+    pub tags: Vec<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -29,9 +29,9 @@ struct Args {
     #[arg(short, long, default_value_t = false)]
     ignore_option: bool,
 
-     /// ignore response required split
-     #[arg(long)]
-     tags: Option<String>,
+    /// ignore response required split
+    #[arg(long)]
+    tags: Option<String>,
 }
 
 pub fn get_command_config() -> CommandConfig {
@@ -45,10 +45,18 @@ pub fn get_command_config() -> CommandConfig {
         ignore_option: args.ignore_option,
         tags: {
             if let Some(tags) = args.tags {
-                tags.split(",").map(|v| v.to_string() ).collect()
-            }else {
+                tags.split(",")
+                    .filter_map(|v| {
+                        if v.is_empty() {
+                            None
+                        } else {
+                            Some(v.trim().to_string())
+                        }
+                    })
+                    .collect()
+            } else {
                 vec![]
             }
-        }
+        },
     }
 }

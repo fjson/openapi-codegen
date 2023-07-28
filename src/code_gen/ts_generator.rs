@@ -70,7 +70,9 @@ fn create_controller(
     let mut module_path_map = HashMap::new();
 
     for module in open_api_parser.get_module_list(command_config) {
-        let module_dir_path = controller_dir_path.as_path().join(&module.name);
+        let module_name = &module.description;
+        let module_name = module_name.split_whitespace().collect::<Vec<&str>>().join("");
+        let module_dir_path = controller_dir_path.as_path().join(module_name);
         if let Some(module_dir_path) = module_dir_path.to_str() {
             module_path_map.insert(module.name, String::from(module_dir_path));
         }
@@ -203,7 +205,10 @@ fn create_controller(
 
 /// 生成接口导出项
 fn create_entry_export_template(controller_dir_name: &str, tag: &OpenApiModule) -> String {
-    let module = &tag.name;
+    let module_name = &tag.description;
+    let module_name = module_name.split_whitespace().collect::<Vec<&str>>().join("");
+
+    let module = module_name;
     let desc = &tag.description;
     String::from(format!(
         r#"// {desc} 
