@@ -149,7 +149,11 @@ fn open_3_get_api_list(
                             String::new()
                         },
                         method,
-                        operation_id: operation_id.to_string(),
+                        operation_id: format!(
+                            "{}{}",
+                            command_config.prefix,
+                            operation_id.to_string()
+                        ),
                         url: url.to_string(),
                         request_schema_name: request_type.0,
                         request_type_name: request_type.1,
@@ -275,20 +279,21 @@ fn open_3_create_ts_interface_enum(
     let mut interface_str = format!("interface {} {{", &interface_name);
 
     let mut open_api_schema_vec: Vec<(&String, &Open3Schema)> =
-        components_schema.properties.iter().collect();
+        if let Some(properties) = &components_schema.properties {
+            properties.into_iter().collect()
+        } else {
+            vec![]
+        };
     open_api_schema_vec.sort_by(|a, b| a.0.cmp(&b.0));
-
     let required_default_vec = vec![];
     let required_vec = if let Some(required_vec) = &components_schema.required {
         required_vec
     } else {
         &required_default_vec
     };
-
     let is_request_name_interface = request_type_name_vec.contains(&&interface_name);
     let ignore_option = !is_request_name_interface && *ignore_option;
-
-    for (property_name, property) in open_api_schema_vec {
+    for (property_name, property) in open_api_schema_vec.iter() {
         let property_option_split = if ignore_option || required_vec.contains(property_name) {
             ""
         } else {
@@ -310,6 +315,13 @@ fn open_3_create_ts_interface_enum(
   {property_name}{property_option_split}: {schema_type};"
         );
         interface_str.push_str(&interface_item);
+    }
+    // 对于空的interface，添加string unknown的签名
+    if open_api_schema_vec.is_empty() {
+        interface_str.push_str(
+            r"
+  [key:string]:unknown;",
+        );
     }
     interface_str.push_str("\n}\n\n");
     interface_str

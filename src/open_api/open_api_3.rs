@@ -132,7 +132,7 @@ pub struct Open3ComponentsSchema {
     #[serde(alias = "type")]
     pub schema_type: String,
 
-    pub properties: HashMap<String, Open3Schema>,
+    pub properties: Option<HashMap<String, Open3Schema>>,
 
     pub required: Option<Vec<String>>,
 }

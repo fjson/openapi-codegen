@@ -8,6 +8,7 @@ pub struct CommandConfig {
     pub controller_dir_name: String,
     pub ignore_option: bool,
     pub tags: Vec<String>,
+    pub prefix: String
 }
 
 #[derive(Parser, Debug)]
@@ -32,6 +33,10 @@ struct Args {
     /// ignore response required split
     #[arg(long)]
     tags: Option<String>,
+
+    /// prefix
+    #[arg(long)]
+    prefix: Option<String>,
 }
 
 pub fn get_command_config() -> CommandConfig {
@@ -58,5 +63,10 @@ pub fn get_command_config() -> CommandConfig {
                 vec![]
             }
         },
+        prefix: if args.prefix.is_some() {
+            format!("{}_",  args.prefix.unwrap().split_whitespace().collect::<Vec<&str>>().join("").trim().to_string())
+        } else {
+            String::from("")
+        }
     }
 }
