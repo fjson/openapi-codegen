@@ -1,16 +1,16 @@
-use std::{
-    collections::HashMap,
-    fs::{self, OpenOptions},
-    io::Write,
-    path::{Path, PathBuf},
-};
-use log::info;
 use crate::{
     command_config::CommandConfig,
     open_parser::{
         open_api_javascript::OpenApiJavaScriptParser,
         parser_tools::{OpenApiModule, OpenApiRequester},
     },
+};
+use log::info;
+use std::{
+    collections::HashMap,
+    fs::{self, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
 };
 
 /// 生成 open api typescript调用
@@ -71,7 +71,10 @@ fn create_controller(
 
     for module in open_api_parser.get_module_list(command_config) {
         let module_name = &module.description;
-        let module_name = module_name.split_whitespace().collect::<Vec<&str>>().join("");
+        let module_name = module_name
+            .split_whitespace()
+            .collect::<Vec<&str>>()
+            .join("");
         let module_dir_path = controller_dir_path.as_path().join(module_name);
         if let Some(module_dir_path) = module_dir_path.to_str() {
             module_path_map.insert(module.name, String::from(module_dir_path));
@@ -206,7 +209,10 @@ fn create_controller(
 /// 生成接口导出项
 fn create_entry_export_template(controller_dir_name: &str, tag: &OpenApiModule) -> String {
     let module_name = &tag.description;
-    let module_name = module_name.split_whitespace().collect::<Vec<&str>>().join("");
+    let module_name = module_name
+        .split_whitespace()
+        .collect::<Vec<&str>>()
+        .join("");
 
     let module = module_name;
     let desc = &tag.description;
@@ -230,7 +236,7 @@ fn create_api_call(open_api_request: &OpenApiRequester) -> String {
     let api_url = &open_api_request.url;
     let method_name = if summary.starts_with("[No Auth]") {
         format!("{method}NoAuth")
-    }else {
+    } else {
         method.to_string()
     };
     format!(
@@ -268,10 +274,28 @@ fn create_ts_d_ts(command_config: &CommandConfig, open_api_parser: &impl OpenApi
         .write(true)
         .open(workspace_path.join("api.d.ts"))
         .expect("ts .d open error");
+    if let Some(namespace) = &command_config.namespace {
+        ts_d_f
+            .write_all(
+                format!(
+                    r#"declare namespace {namespace} {{
+"#
+                )
+                .as_bytes(),
+            )
+            .expect("ts .d write error");
+    }
     for value in open_api_parser.get_interface_enum_list(&command_config.ignore_option) {
         ts_d_f
             .write_all(value.as_bytes())
             .expect(format!("{} td type write error", value).as_str());
+    }
+    if let Some(_) = &command_config.namespace {
+        ts_d_f
+            .write_all(format!(r#"}}"#,)
+                .as_bytes(),
+            )
+            .expect("ts .d write error");
     }
 }
 

@@ -133,7 +133,8 @@ fn open_3_get_api_list(
             if let Some(api_config) = request {
                 let module = &api_config.tags[0];
                 let operation_id = &api_config.operation_id;
-                let request_type = open_3_get_request_type_name(&config, &api_config);
+                let request_type =
+                    open_3_get_request_type_name(&config, &api_config, command_config);
                 // 如果已经指定了tag， 则忽略其他tag
                 if !command_config.tags.is_empty() {
                     if !command_config.tags.contains(&module) {
@@ -151,14 +152,21 @@ fn open_3_get_api_list(
                         method,
                         operation_id: format!(
                             "{}{}",
-                            command_config.prefix,
+                            command_config
+                                .opration_prefix
+                                .as_ref()
+                                .unwrap_or(&"".to_string()),
                             operation_id.to_string()
                         ),
                         url: url.to_string(),
                         request_schema_name: request_type.0,
+                        // 可作为调用方法的参数类型， 已经处理是否可选
                         request_type_name: request_type.1,
                         content_type: String::from("application/json"),
-                        response_type_name: open_3_get_response_type_name(&api_config),
+                        response_type_name: open_3_get_response_type_name(
+                            &api_config,
+                            command_config,
+                        ),
                     },
                 ))
             }
@@ -168,7 +176,10 @@ fn open_3_get_api_list(
 }
 
 /// 获取响应类型名称
-fn open_3_get_response_type_name(api_config: &Open3ApiConfig) -> String {
+fn open_3_get_response_type_name(
+    api_config: &Open3ApiConfig,
+    command_config: &CommandConfig,
+) -> String {
     if let Some(response_content_map) = api_config
         .responses
         .get("200")
@@ -177,7 +188,11 @@ fn open_3_get_response_type_name(api_config: &Open3ApiConfig) -> String {
         for (_, response_content) in response_content_map {
             if let Some(response_content) = response_content {
                 let schema = &response_content.schema;
-                return open_3_get_type_name_from_schema(schema, "");
+                return open_3_get_type_name_from_schema(
+                    schema,
+                    command_config.namespace.clone(),
+                    "",
+                );
             }
         }
     }
@@ -185,9 +200,15 @@ fn open_3_get_response_type_name(api_config: &Open3ApiConfig) -> String {
 }
 
 /// 获取请求参数类型名称
+/// 
+/// 如若当前的请求参数类型是可选的 则会在类型后面拼接 | void，
+/// 将拼接结果作为第二个参数返回
+/// 
+/// 如果命令行参数指定了module 则会将根据module生成的namespace拼接在类型前
 fn open_3_get_request_type_name(
     open_config: &Open3Config,
     api_config: &Open3ApiConfig,
+    command_config: &CommandConfig,
 ) -> (String, String) {
     if let Some(schema_ref) = api_config
         .request_body
@@ -197,6 +218,12 @@ fn open_3_get_request_type_name(
     {
         let is_required = open_3_schema_is_required(open_config, schema_ref);
         let type_name = open_3_get_type_name_from_schema_ref(schema_ref);
+        // 如果指定namespace 则需要在类型前添加namespace.
+        let type_name = if let Some(namespace) = &command_config.namespace {
+            format!("{}.{}", namespace, type_name)
+        } else {
+            type_name
+        };
         let mut type_name_clone = type_name.clone();
         if !type_name.eq("void") {
             return (
@@ -214,9 +241,20 @@ fn open_3_get_request_type_name(
 }
 
 /// 根据schema生成响应类型名称
-fn open_3_get_type_name_from_schema(schema: &Open3Schema, generic: &str) -> String {
+/// 
+/// 如果命令行参数指定了module 则会将根据module生成的namespace拼接在类型前
+fn open_3_get_type_name_from_schema(
+    schema: &Open3Schema,
+    namespace: Option<String>,
+    generic: &str,
+) -> String {
     if let Some(schema_ref) = &schema.schema_ref {
         let schema_ref = open_3_get_type_name_from_schema_ref(schema_ref);
+        let schema_ref = if let Some(namespace) = namespace {
+            format!("{}.{}", namespace, schema_ref)
+        } else {
+            schema_ref
+        };
         if generic.is_empty() {
             return schema_ref;
         }
@@ -229,7 +267,11 @@ fn open_3_get_type_name_from_schema(schema: &Open3Schema, generic: &str) -> Stri
     }
     if let Some(schema_type) = &schema.schema_type {
         if schema_type.eq("array") {
-            return open_3_get_type_name_from_schema(schema.items.as_ref().unwrap(), "Array<T>");
+            return open_3_get_type_name_from_schema(
+                schema.items.as_ref().unwrap(),
+                namespace,
+                "Array<T>",
+            );
         }
         return ts_type_translate(&schema_type.clone());
     }
@@ -237,6 +279,9 @@ fn open_3_get_type_name_from_schema(schema: &Open3Schema, generic: &str) -> Stri
 }
 
 /// 根据schema ref获取schema名称
+/// 
+/// 如：#/components/schemas/Result«User»
+/// 则返回 Result«User»
 fn get_schema_name_from_schema_ref(schema_ref: &str) -> String {
     lazy_static! {
         static ref SCHEMA_NAME_REGEX: Regex = Regex::new(r".*/").unwrap();
@@ -245,6 +290,9 @@ fn get_schema_name_from_schema_ref(schema_ref: &str) -> String {
 }
 
 /// 根据schema ref获取类型名称
+/// 
+/// 如：#/components/schemas/Result«User»
+/// 则返回 ResultUser
 fn open_3_get_type_name_from_schema_ref(schema_ref: &str) -> String {
     lazy_static! {
         static ref SCHEMA_TYPE_NAME_REGEX: Regex = Regex::new(r"[«»]").unwrap();
@@ -277,7 +325,6 @@ fn open_3_create_ts_interface_enum(
 ) -> String {
     let interface_name = open_3_get_type_name_from_schema_ref(&components_schema.title);
     let mut interface_str = format!("interface {} {{", &interface_name);
-
     let mut open_api_schema_vec: Vec<(&String, &Open3Schema)> =
         if let Some(properties) = &components_schema.properties {
             properties.into_iter().collect()
@@ -299,7 +346,7 @@ fn open_3_create_ts_interface_enum(
         } else {
             "?"
         };
-        let schema_type = open_3_get_type_name_from_schema(property, "");
+        let schema_type = open_3_get_type_name_from_schema(property, None, "");
         let description = if let Some(description) = &property.description {
             description
         } else {

@@ -1,5 +1,7 @@
 use clap::Parser;
 
+use crate::tools::tools::capitalize;
+
 #[derive(Debug, Clone)]
 pub struct CommandConfig {
     pub workspace: String,
@@ -8,7 +10,8 @@ pub struct CommandConfig {
     pub controller_dir_name: String,
     pub ignore_option: bool,
     pub tags: Vec<String>,
-    pub prefix: String
+    pub opration_prefix: Option<String>,
+    pub namespace: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -34,13 +37,20 @@ struct Args {
     #[arg(long)]
     tags: Option<String>,
 
-    /// prefix
+    /// namespace
     #[arg(long)]
-    prefix: Option<String>,
+    namespace: Option<String>,
 }
 
 pub fn get_command_config() -> CommandConfig {
     let args = Args::parse();
+
+    let opration_prefix = if args.namespace.is_some() {
+       args.namespace.unwrap().split_whitespace().collect::<Vec<&str>>().join("").trim().to_string()
+    } else {
+        String::from("")
+    };
+
 
     CommandConfig {
         workspace: args.output,
@@ -63,10 +73,15 @@ pub fn get_command_config() -> CommandConfig {
                 vec![]
             }
         },
-        prefix: if args.prefix.is_some() {
-            format!("{}_",  args.prefix.unwrap().split_whitespace().collect::<Vec<&str>>().join("").trim().to_string())
-        } else {
-            String::from("")
+        opration_prefix: if opration_prefix.is_empty() {
+            None
+        }else {
+            Some(format!("{}_", &opration_prefix))
+        },
+        namespace: if opration_prefix.is_empty() {
+            None
+        }else {
+            Some(capitalize(&opration_prefix).to_string())
         }
     }
 }
