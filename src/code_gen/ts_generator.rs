@@ -292,9 +292,7 @@ fn create_ts_d_ts(command_config: &CommandConfig, open_api_parser: &impl OpenApi
     }
     if let Some(_) = &command_config.namespace {
         ts_d_f
-            .write_all(format!(r#"}}"#,)
-                .as_bytes(),
-            )
+            .write_all(format!(r#"}}"#,).as_bytes())
             .expect("ts .d write error");
     }
 }
@@ -330,8 +328,18 @@ class Resource {
         return Promise.resolve();
     }
 
+    postNoAuth<T>(url: string, req: RequestParam, config?: RequestConfig): Promise<any> {
+        console.log("please impl postNoAuth");
+        return Promise.resolve();
+    }
+
     get<T>(url: string, req: RequestParam, config?: RequestConfig): Promise<any> {
         console.log("please impl get");
+        return Promise.resolve();
+    }
+
+    getNoAuth<T>(url: string, req: RequestParam, config?: RequestConfig): Promise<any> {
+        console.log("please impl getNoAuth");
         return Promise.resolve();
     }
 
