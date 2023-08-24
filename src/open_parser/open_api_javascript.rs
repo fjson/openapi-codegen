@@ -248,6 +248,9 @@ fn open_3_get_type_name_from_schema(
     namespace: Option<String>,
     generic: &str,
 ) -> String {
+    lazy_static! {
+        static ref SCHEMA_GENERIC_REGEX: Regex = Regex::new(r"<T>").unwrap();
+    }
     if let Some(schema_ref) = &schema.schema_ref {
         let schema_ref = open_3_get_type_name_from_schema_ref(schema_ref);
         let schema_ref = if let Some(namespace) = namespace {
@@ -257,9 +260,6 @@ fn open_3_get_type_name_from_schema(
         };
         if generic.is_empty() {
             return schema_ref;
-        }
-        lazy_static! {
-            static ref SCHEMA_GENERIC_REGEX: Regex = Regex::new(r"<T>").unwrap();
         }
         return SCHEMA_GENERIC_REGEX
             .replace_all(generic, format!("<{}>", schema_ref))
@@ -273,7 +273,13 @@ fn open_3_get_type_name_from_schema(
                 "Array<T>",
             );
         }
-        return ts_type_translate(&schema_type.clone());
+        let translate_type =  ts_type_translate(&schema_type.clone());
+        if generic.is_empty() {
+            return translate_type;
+        }
+        return SCHEMA_GENERIC_REGEX
+            .replace_all(generic, format!("<{}>", translate_type))
+            .to_string();
     }
     String::from("void")
 }
