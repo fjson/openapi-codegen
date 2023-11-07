@@ -25,15 +25,15 @@ struct Args {
     #[arg(short, long)]
     config: String,
 
-    /// is aplit api file
+    /// is split api file
     #[arg(short, long, default_value_t = false)]
     split: bool,
 
-    /// ignore response required split
+    /// ignore response required 
     #[arg(short, long, default_value_t = false)]
     ignore_option: bool,
 
-    /// ignore response required split
+    /// generate special tag api
     #[arg(long)]
     tags: Option<String>,
 

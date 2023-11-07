@@ -5,11 +5,13 @@ use crate::{
         parser_tools::{OpenApiModule, OpenApiRequester},
     },
 };
+use lazy_static::lazy_static;
 use log::info;
+use regex::Regex;
 use std::{
     collections::HashMap,
     fs::{self, OpenOptions},
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -43,15 +45,40 @@ pub fn create_entry_file(
     // 创建并打开入口文件
     let mut f = OpenOptions::new()
         .create(true)
-        .truncate(true)
+        .read(true)
         .write(true)
         .open(entry_file_path)
         .expect("cannot open entry file");
 
+    // 解析现有入口文件中的模块
+    let mut old_content = String::new();
+    f.read_to_string(&mut old_content).unwrap();
+    lazy_static! {
+        static ref MODULENAME_REGEX: Regex = Regex::new(r#"\./(.*)['"]"#).unwrap();
+    }
+    let get_module_name = |v: &str| {
+        if let Some(module_name) = MODULENAME_REGEX.captures(v) {
+            if let Some(module_name) = module_name.get(1) {
+                return Some(module_name.as_str().to_string());
+            }
+        }
+        None
+    };
+    let old_module_list: Vec<String> = old_content
+        .split_whitespace()
+        .filter_map(|v| get_module_name(v))
+        .collect();
+
     // 写入入口文件内容
-    for module in open_api_parser.get_module_list(command_config) {
+    for module in open_api_parser.get_module_list() {
         let write_content =
             create_entry_export_template(&command_config.controller_dir_name, &module);
+        // 如果发现生成额模块引用已存在于入口文件中， 则不再写入
+        if let Some(module_name) = get_module_name(&write_content) {
+            if old_module_list.contains(&module_name) {
+                continue;
+            }
+        }
         f.write_all(write_content.as_bytes())
             .expect(format!("{} write error", write_content).as_str());
     }
@@ -69,7 +96,7 @@ fn create_controller(
     // 存储所有的路径
     let mut module_path_map = HashMap::new();
 
-    for module in open_api_parser.get_module_list(command_config) {
+    for module in open_api_parser.get_module_list() {
         let module_name = &module.description;
         let module_name = module_name
             .split_whitespace()

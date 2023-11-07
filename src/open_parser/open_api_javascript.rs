@@ -12,38 +12,44 @@ use std::collections::HashMap;
 pub trait OpenApiJavaScriptParser {
     /// 获取模块列表
     /// 可利用模块列表生成模块文件或文件夹对接口进行分类
-    fn get_module_list(&self, command_config: &CommandConfig) -> Vec<OpenApiModule>;
+    fn get_module_list(&self) -> Vec<OpenApiModule>;
 
     /// 返回api列表
     fn get_api_list(&self) -> &Vec<(String, OpenApiRequester)>;
 
-    /// 获取类型列表
+    /// 获取所有类型列表
     fn get_interface_enum_list(&self, ignore_option: &bool) -> Vec<String>;
 }
 
-pub struct OpenApi3JavaScript<'a> {
+pub struct OpenApi3JavaScript<'a, 'b> {
     config: &'a mut Open3Config,
+    command_config: &'b CommandConfig,
     api_list: Vec<(String, OpenApiRequester)>,
 }
 
-impl<'a> OpenApi3JavaScript<'a> {
+impl<'a, 'b> OpenApi3JavaScript<'a, 'b> {
     pub fn new(
         config: &'a mut Open3Config,
-        command_config: &CommandConfig,
-    ) -> OpenApi3JavaScript<'a> {
+        command_config: &'b CommandConfig,
+    ) -> OpenApi3JavaScript<'a, 'b> {
         let api_list = open_3_get_api_list(config, command_config);
-        OpenApi3JavaScript { config, api_list }
+        OpenApi3JavaScript {
+            config,
+            api_list,
+            command_config,
+        }
     }
 }
 
-impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_> {
-    fn get_module_list(&self, command_config: &CommandConfig) -> Vec<OpenApiModule> {
+impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_, '_> {
+    fn get_module_list(&self) -> Vec<OpenApiModule> {
         self.config
             .tags
             .iter()
             .filter_map(|v| {
                 let name = v.name.to_string();
-                if !command_config.tags.is_empty() && !command_config.tags.contains(&name) {
+                if !self.command_config.tags.is_empty() && !self.command_config.tags.contains(&name)
+                {
                     None
                 } else {
                     Some(OpenApiModule {
@@ -59,6 +65,7 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_> {
         &self.api_list
     }
 
+    /// 获取所有的接口列表
     fn get_interface_enum_list(&self, ignore_option: &bool) -> Vec<String> {
         let mut str_vec = vec![];
 
@@ -200,10 +207,10 @@ fn open_3_get_response_type_name(
 }
 
 /// 获取请求参数类型名称
-/// 
+///
 /// 如若当前的请求参数类型是可选的 则会在类型后面拼接 | void，
 /// 将拼接结果作为第二个参数返回
-/// 
+///
 /// 如果命令行参数指定了module 则会将根据module生成的namespace拼接在类型前
 fn open_3_get_request_type_name(
     open_config: &Open3Config,
@@ -241,7 +248,7 @@ fn open_3_get_request_type_name(
 }
 
 /// 根据schema生成响应类型名称
-/// 
+///
 /// 如果命令行参数指定了module 则会将根据module生成的namespace拼接在类型前
 fn open_3_get_type_name_from_schema(
     schema: &Open3Schema,
@@ -273,7 +280,7 @@ fn open_3_get_type_name_from_schema(
                 "Array<T>",
             );
         }
-        let translate_type =  ts_type_translate(&schema_type.clone());
+        let translate_type = ts_type_translate(&schema_type.clone());
         if generic.is_empty() {
             return translate_type;
         }
@@ -285,7 +292,7 @@ fn open_3_get_type_name_from_schema(
 }
 
 /// 根据schema ref获取schema名称
-/// 
+///
 /// 如：#/components/schemas/Result«User»
 /// 则返回 Result«User»
 fn get_schema_name_from_schema_ref(schema_ref: &str) -> String {
@@ -296,7 +303,7 @@ fn get_schema_name_from_schema_ref(schema_ref: &str) -> String {
 }
 
 /// 根据schema ref获取类型名称
-/// 
+///
 /// 如：#/components/schemas/Result«User»
 /// 则返回 ResultUser
 fn open_3_get_type_name_from_schema_ref(schema_ref: &str) -> String {
