@@ -1,6 +1,6 @@
 [package]
 name = "open-api-codegen"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [profile.release]
@@ -20,4 +20,6 @@ lazy_static = "1.4.0"
 clap = { version = "4.0.27", features = ["derive"] }
 log = "0.4.0"
 env_logger = "0.10.0"
+
+[target.'cfg(unix)'.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
