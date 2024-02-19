@@ -2,7 +2,7 @@ use super::parser_tools::{OpenApiModule, OpenApiRequester};
 use crate::{
     command_config::CommandConfig,
     open_api::open_api_3::{
-        Open3ApiConfig, Open3ComponentsSchema, Open3Config, Open3Requests, Open3Schema,
+        Open3ApiConfig, Open3Components, Open3ComponentsSchema, Open3Config, Open3Requests, Open3Schema
     },
 };
 use lazy_static::lazy_static;
@@ -126,6 +126,9 @@ pub fn ts_type_translate(data_type: &str) -> String {
 ///
 /// 可通过以下方式扩展对get的支持
 ///
+/// 将path param和query param合并生产新的类型
+/// 可使用operation_id + 关键字作为地址参数的类型名称
+///
 /// - 1、指定request type name
 /// - 2、向components里面追加新的Schema
 fn open_3_get_api_list(
@@ -141,7 +144,7 @@ fn open_3_get_api_list(
                 let module = &api_config.tags[0];
                 let operation_id = &api_config.operation_id;
                 let request_type =
-                    open_3_get_request_type_name(&config, &api_config, command_config);
+                    open_3_get_request_type_name(&mut config.components, &api_config, command_config);
                 // 如果已经指定了tag， 则忽略其他tag
                 if !command_config.tags.is_empty() {
                     if !command_config.tags.contains(&module) {
@@ -160,7 +163,7 @@ fn open_3_get_api_list(
                         operation_id: format!(
                             "{}{}",
                             command_config
-                                .opration_prefix
+                                .operation_prefix
                                 .as_ref()
                                 .unwrap_or(&"".to_string()),
                             operation_id.to_string()
@@ -213,7 +216,7 @@ fn open_3_get_response_type_name(
 ///
 /// 如果命令行参数指定了module 则会将根据module生成的namespace拼接在类型前
 fn open_3_get_request_type_name(
-    open_config: &Open3Config,
+    components: &mut Open3Components,
     api_config: &Open3ApiConfig,
     command_config: &CommandConfig,
 ) -> (String, String) {
@@ -223,7 +226,7 @@ fn open_3_get_request_type_name(
         .and_then(|x| x.content.get("application/json"))
         .and_then(|x| x.schema.schema_ref.as_ref())
     {
-        let is_required = open_3_schema_is_required(open_config, schema_ref);
+        let is_required = open_3_schema_is_required(components, schema_ref);
         let type_name = open_3_get_type_name_from_schema_ref(schema_ref);
         // 如果指定namespace 则需要在类型前添加namespace.
         let type_name = if let Some(namespace) = &command_config.namespace {
@@ -317,10 +320,9 @@ fn open_3_get_type_name_from_schema_ref(schema_ref: &str) -> String {
 }
 
 /// 判断 schema 参数是否是必须的
-fn open_3_schema_is_required(open_config: &Open3Config, scheme_ref: &str) -> bool {
+fn open_3_schema_is_required(components: &Open3Components, scheme_ref: &str) -> bool {
     let schema_name = get_schema_name_from_schema_ref(scheme_ref);
-    if let Some(required) = open_config
-        .components
+    if let Some(required) = components
         .schemas
         .get(&schema_name)
         .and_then(|x| x.required.as_ref())

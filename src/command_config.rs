@@ -10,7 +10,7 @@ pub struct CommandConfig {
     pub controller_dir_name: String,
     pub ignore_option: bool,
     pub tags: Vec<String>,
-    pub opration_prefix: Option<String>,
+    pub operation_prefix: Option<String>,
     pub namespace: Option<String>,
 }
 
@@ -45,7 +45,7 @@ struct Args {
 pub fn get_command_config() -> CommandConfig {
     let args = Args::parse();
 
-    let opration_prefix = if args.namespace.is_some() {
+    let operation_prefix = if args.namespace.is_some() {
        args.namespace.unwrap().split_whitespace().collect::<Vec<&str>>().join("").trim().to_string()
     } else {
         String::from("")
@@ -73,15 +73,15 @@ pub fn get_command_config() -> CommandConfig {
                 vec![]
             }
         },
-        opration_prefix: if opration_prefix.is_empty() {
+        operation_prefix: if operation_prefix.is_empty() {
             None
         }else {
-            Some(format!("{}_", &opration_prefix))
+            Some(format!("{}_", &operation_prefix))
         },
-        namespace: if opration_prefix.is_empty() {
+        namespace: if operation_prefix.is_empty() {
             None
         }else {
-            Some(capitalize(&opration_prefix).to_string())
+            Some(capitalize(&operation_prefix).to_string())
         }
     }
 }
