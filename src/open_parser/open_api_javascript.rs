@@ -2,7 +2,8 @@ use super::parser_tools::{OpenApiModule, OpenApiRequester};
 use crate::{
     command_config::CommandConfig,
     open_api::open_api_3::{
-        Open3ApiConfig, Open3Components, Open3ComponentsSchema, Open3Config, Open3Requests, Open3Schema
+        Open3ApiConfig, Open3Components, Open3ComponentsSchema, Open3Config, Open3Requests,
+        Open3Schema,
     },
 };
 use lazy_static::lazy_static;
@@ -73,16 +74,17 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_, '_> {
             self.config.components.schemas.iter().collect();
         components_schema_vec.sort_by(|a, b| a.0.cmp(&b.0));
 
-        let request_scheme_name_vec: Vec<&String> = self
+        let request_scheme_name_vec: Vec<String> = self
             .api_list
             .iter()
-            .map(|v| &v.1.request_schema_name)
+            .map(|v| v.1.request_schema_name.to_string())
             .collect();
 
         for (_, schema) in components_schema_vec {
             str_vec.push(open_3_create_ts_interface_enum(
                 schema,
                 &request_scheme_name_vec,
+                &self.command_config.namespace,
                 ignore_option,
             ));
         }
@@ -143,8 +145,11 @@ fn open_3_get_api_list(
             if let Some(api_config) = request {
                 let module = &api_config.tags[0];
                 let operation_id = &api_config.operation_id;
-                let request_type =
-                    open_3_get_request_type_name(&mut config.components, &api_config, command_config);
+                let request_type = open_3_get_request_type_name(
+                    &mut config.components,
+                    &api_config,
+                    command_config,
+                );
                 // 如果已经指定了tag， 则忽略其他tag
                 if !command_config.tags.is_empty() {
                     if !command_config.tags.contains(&module) {
@@ -335,7 +340,8 @@ fn open_3_schema_is_required(components: &Open3Components, scheme_ref: &str) -> 
 /// 生成typescript interface类型
 fn open_3_create_ts_interface_enum(
     components_schema: &Open3ComponentsSchema,
-    request_type_name_vec: &Vec<&String>,
+    request_type_name_vec: &Vec<String>,
+    namespace: &Option<String>,
     ignore_option: &bool,
 ) -> String {
     let interface_name = open_3_get_type_name_from_schema_ref(&components_schema.title);
@@ -348,12 +354,17 @@ fn open_3_create_ts_interface_enum(
         };
     open_api_schema_vec.sort_by(|a, b| a.0.cmp(&b.0));
     let required_default_vec = vec![];
-    let required_vec = if let Some(required_vec) = &components_schema.required {
+    let required_vec: &Vec<String> = if let Some(required_vec) = &components_schema.required {
         required_vec
     } else {
         &required_default_vec
     };
-    let is_request_name_interface = request_type_name_vec.contains(&&interface_name);
+    let interface_with_namespace = if let Some(namespace) = namespace {
+        format!("{}.{}", namespace, interface_name)
+    } else {
+        interface_name.to_string()
+    };
+    let is_request_name_interface = request_type_name_vec.contains(&interface_with_namespace);
     let ignore_option = !is_request_name_interface && *ignore_option;
     for (property_name, property) in open_api_schema_vec.iter() {
         let property_option_split = if ignore_option || required_vec.contains(property_name) {
