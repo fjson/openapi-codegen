@@ -1,5 +1,9 @@
 ## ！！！适用于OpenApi 3
 
+### 支持情况
+
+目前仅支持swagger3(OpenApi3), 支持的请求类型 get post delete put
+
 ### 开发环境
 
 - rustc: 1.67.0

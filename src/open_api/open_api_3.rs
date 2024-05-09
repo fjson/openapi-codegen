@@ -64,6 +64,20 @@ pub struct Open3ApiConfig {
     pub summary: Option<String>,
 
     pub tags: Vec<String>,
+
+    pub parameters: Option<Vec<Open3Parameters>>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Open3Parameters {
+    pub name: String,
+
+    #[serde(alias = "in")]
+    pub parameters_in: String,
+
+    pub description: Option<String>,
+
+    pub required: bool,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

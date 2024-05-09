@@ -20,7 +20,7 @@ pub struct OpenApiRequester {
     pub request_type_name: String,
 
     /// 请求的 content_type
-    pub content_type: String,
+    // pub content_type: String,
 
     pub response_type_name: String,
 }

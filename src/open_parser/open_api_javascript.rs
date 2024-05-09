@@ -5,6 +5,7 @@ use crate::{
         Open3ApiConfig, Open3Components, Open3ComponentsSchema, Open3Config, Open3Requests,
         Open3Schema,
     },
+    tools::tools::capitalize,
 };
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -93,7 +94,7 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_, '_> {
 }
 
 /// 将open api类型转成ts对应的类型
-pub fn ts_type_translate(data_type: &str) -> String {
+pub fn ts_type_transform(data_type: &str) -> String {
     lazy_static! {
         static ref JS_TYPE_MAP: HashMap<&'static str, &'static str> = {
             let mut m = HashMap::new();
@@ -124,15 +125,11 @@ pub fn ts_type_translate(data_type: &str) -> String {
     }
 }
 
-/// 目前Get请求参数处理是有问题的
-///
-/// 可通过以下方式扩展对get的支持
-///
-/// 将path param和query param合并生产新的类型
-/// 可使用operation_id + 关键字作为地址参数的类型名称
-///
-/// - 1、指定request type name
-/// - 2、向components里面追加新的Schema
+/// 处理OpenApi3的类型
+/// 
+/// 转换成易处理的 OpenApiRequester 类型
+/// 
+/// 目前仅支持get post delete put
 fn open_3_get_api_list(
     config: &mut Open3Config,
     command_config: &CommandConfig,
@@ -146,6 +143,7 @@ fn open_3_get_api_list(
                 let module = &api_config.tags[0];
                 let operation_id = &api_config.operation_id;
                 let request_type = open_3_get_request_type_name(
+                    &method,
                     &mut config.components,
                     &api_config,
                     command_config,
@@ -177,7 +175,7 @@ fn open_3_get_api_list(
                         request_schema_name: request_type.0,
                         // 可作为调用方法的参数类型， 已经处理是否可选
                         request_type_name: request_type.1,
-                        content_type: String::from("application/json"),
+                        // content_type: String::from("application/json"),
                         response_type_name: open_3_get_response_type_name(
                             &api_config,
                             command_config,
@@ -219,9 +217,84 @@ fn open_3_get_response_type_name(
 /// 如若当前的请求参数类型是可选的 则会在类型后面拼接 | void，
 /// 将拼接结果作为第二个参数返回
 ///
-/// 如果命令行参数指定了module 则会将根据module生成的namespace拼接在类型前
+/// 如果命令行参数指定了namespace 则会将namespace拼接在类型前
+///
+/// 对于get/delete请求
+///
+/// - 根据api_config判断当前请求类型
+/// - 如果使用path或query参数
+/// - 将path和query参数混合生成新的类型塞进components（可使用operation_id + 关键字作为地址参数的类型名称）
 fn open_3_get_request_type_name(
+    method: &str,
     components: &mut Open3Components,
+    api_config: &Open3ApiConfig,
+    command_config: &CommandConfig,
+) -> (String, String) {
+    if vec!["get", "delete"].contains(&method) {
+        generate_get_request_type(components, api_config, command_config)
+    } else {
+        generate_post_request_type(components, api_config, command_config)
+    }
+}
+
+/// 生成get请求的请求类型并塞进components
+fn generate_get_request_type(
+    components: &mut Open3Components,
+    api_config: &Open3ApiConfig,
+    command_config: &CommandConfig,
+) -> (String, String) {
+    let schemas = &mut components.schemas;
+    let mut properties = HashMap::new();
+    let type_name = format!("{}Query", capitalize(&api_config.operation_id));
+    let type_name_with_namespace = if let Some(namespace) = &command_config.namespace {
+        format!("{}.{}", namespace, type_name)
+    } else {
+        type_name.clone()
+    };
+    let mut required_vec = Vec::new();
+    if let Some(parameters) = &api_config.parameters {
+        parameters.iter().for_each(|v| {
+            properties.insert(
+                v.name.clone(),
+                Open3Schema {
+                    schema_type: Some("string".to_string()),
+                    schema_ref: None,
+                    items: None,
+                    property_enum: None,
+                    format: None,
+                    description: v.description.clone(),
+                },
+            );
+            if v.required {
+                required_vec.push(v.name.clone());
+            }
+        });
+    }
+    let required_vec_is_empty = required_vec.is_empty();
+    let properties_is_empty = properties.is_empty();
+    if properties_is_empty {
+        return (String::from("void"), String::from("void"));
+    }
+    let components_schema = Open3ComponentsSchema {
+        title: type_name.clone(),
+        schema_type: "object".to_string(),
+        properties: Some(properties),
+        required: Some(required_vec),
+    };
+    schemas.insert(type_name.clone(), components_schema);
+    (
+        type_name_with_namespace.clone(),
+        if !required_vec_is_empty {
+            type_name_with_namespace
+        } else {
+            format!("{} | void", type_name_with_namespace)
+        },
+    )
+}
+
+/// 获取post请求的请求类型
+fn generate_post_request_type(
+    components: &Open3Components,
     api_config: &Open3ApiConfig,
     command_config: &CommandConfig,
 ) -> (String, String) {
@@ -257,7 +330,7 @@ fn open_3_get_request_type_name(
 
 /// 根据schema生成响应类型名称
 ///
-/// 如果命令行参数指定了module 则会将根据module生成的namespace拼接在类型前
+/// 如果命令行参数指定了namesapce 则会将namespace拼接在类型前
 fn open_3_get_type_name_from_schema(
     schema: &Open3Schema,
     namespace: Option<String>,
@@ -288,7 +361,7 @@ fn open_3_get_type_name_from_schema(
                 "Array<T>",
             );
         }
-        let translate_type = ts_type_translate(&schema_type.clone());
+        let translate_type = ts_type_transform(&schema_type.clone());
         if generic.is_empty() {
             return translate_type;
         }
