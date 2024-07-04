@@ -126,9 +126,9 @@ pub fn ts_type_transform(data_type: &str) -> String {
 }
 
 /// 处理OpenApi3的类型
-/// 
+///
 /// 转换成易处理的 OpenApiRequester 类型
-/// 
+///
 /// 目前仅支持get post delete put
 fn open_3_get_api_list(
     config: &mut Open3Config,
@@ -162,7 +162,7 @@ fn open_3_get_api_list(
                         } else {
                             String::new()
                         },
-                        method,
+                        method: method.clone(),
                         operation_id: format!(
                             "{}{}",
                             command_config
@@ -180,6 +180,7 @@ fn open_3_get_api_list(
                             &api_config,
                             command_config,
                         ),
+                        is_form: api_config.parameters.is_some() && method.eq("post"),
                     },
                 ))
             }

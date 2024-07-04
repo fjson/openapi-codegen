@@ -258,13 +258,22 @@ fn create_api_call(open_api_request: &OpenApiRequester) -> String {
     let summary = &open_api_request.summary;
     // 响应类型
     let response_type = &open_api_request.response_type_name;
-    let request_type = &open_api_request.request_type_name;
+    let request_type =  if open_api_request.is_form {
+        String::from("FormData")
+    }else {
+        open_api_request.request_type_name.clone()
+    };
     let method = &open_api_request.method;
     let api_url = &open_api_request.url;
-    let method_name = if summary.starts_with("[No Auth]") {
-        format!("{method}NoAuth")
+    let form_name = if open_api_request.is_form {
+        String::from("Form")
     } else {
-        method.to_string()
+        String::from("")
+    };
+    let method_name = if summary.starts_with("[No Auth]") {
+        format!("{method}{}NoAuth", form_name)
+    } else {
+        format!("{}{}", method.to_string(), form_name)
     };
     format!(
         r#"
@@ -339,7 +348,7 @@ fn create_default_resource_file(command_config: &CommandConfig) {
             .expect("resource file open error");
         resource_file
             .write_all(
-                r#"export type RequestParam = object | void;
+                r#"export type RequestParam = Record<string, unknown> | void;
 
 export interface RequestConfig {
     [key:string]:string;
@@ -352,6 +361,16 @@ class Resource {
     config?: RequestConfig
     ): Promise<any> {
         console.log("please impl post");
+        return Promise.resolve();
+    }
+
+    postForm<T>(url: string, req: FormData, config?: RequestConfig): Promise<any> {
+        console.log("please impl postForm");
+        return Promise.resolve();
+    }
+
+    postFormNoAuth<T>(url: string, req: FormData, config?: RequestConfig): Promise<any> {
+        console.log("please impl postFormNoAuth");
         return Promise.resolve();
     }
 

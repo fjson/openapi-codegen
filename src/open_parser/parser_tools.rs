@@ -23,6 +23,10 @@ pub struct OpenApiRequester {
     // pub content_type: String,
 
     pub response_type_name: String,
+
+    /// 判断是否是form
+    /// post请求， 有parameter则视为form
+    pub is_form: bool
 }
 
 pub struct OpenApiModule {
