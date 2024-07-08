@@ -1,5 +1,5 @@
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OpenApiRequester {
     /// 接口说明
     pub summary: String,

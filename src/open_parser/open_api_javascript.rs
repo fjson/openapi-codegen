@@ -27,6 +27,7 @@ pub struct OpenApi3JavaScript<'a, 'b> {
     config: &'a mut Open3Config,
     command_config: &'b CommandConfig,
     api_list: Vec<(String, OpenApiRequester)>,
+    all_api_list: Vec<(String, OpenApiRequester)>,
 }
 
 impl<'a, 'b> OpenApi3JavaScript<'a, 'b> {
@@ -34,11 +35,12 @@ impl<'a, 'b> OpenApi3JavaScript<'a, 'b> {
         config: &'a mut Open3Config,
         command_config: &'b CommandConfig,
     ) -> OpenApi3JavaScript<'a, 'b> {
-        let api_list = open_3_get_api_list(config, command_config);
+        let (api_list, all_api_list) = open_3_get_api_list(config, command_config);
         OpenApi3JavaScript {
             config,
             api_list,
             command_config,
+            all_api_list,
         }
     }
 }
@@ -76,7 +78,7 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_, '_> {
         components_schema_vec.sort_by(|a, b| a.0.cmp(&b.0));
 
         let request_scheme_name_vec: Vec<String> = self
-            .api_list
+            .all_api_list
             .iter()
             .map(|v| v.1.request_schema_name.to_string())
             .collect();
@@ -133,14 +135,18 @@ pub fn ts_type_transform(data_type: &str) -> String {
 fn open_3_get_api_list(
     config: &mut Open3Config,
     command_config: &CommandConfig,
-) -> Vec<(String, OpenApiRequester)> {
+) -> (
+    Vec<(String, OpenApiRequester)>,
+    Vec<(String, OpenApiRequester)>,
+) {
     let mut paths_vec: Vec<(&String, &Open3Requests)> = config.paths.iter().collect();
     paths_vec.sort_by(|a, b| a.0.cmp(b.0));
     let mut api_list: Vec<(String, OpenApiRequester)> = vec![];
+    let mut all_api_list: Vec<(String, OpenApiRequester)> = vec![];
     for (url, requests) in paths_vec {
         for (method, request) in requests.iter() {
             if let Some(api_config) = request {
-                let module = &api_config.tags[0];
+                let module: &String = &api_config.tags[0];
                 let operation_id = &api_config.operation_id;
                 let request_type = open_3_get_request_type_name(
                     &method,
@@ -148,45 +154,41 @@ fn open_3_get_api_list(
                     &api_config,
                     command_config,
                 );
+                let open_api_requester = OpenApiRequester {
+                    summary: if let Some(summary) = &api_config.summary {
+                        summary.to_string()
+                    } else {
+                        String::new()
+                    },
+                    method: method.clone(),
+                    operation_id: format!(
+                        "{}{}",
+                        command_config
+                            .operation_prefix
+                            .as_ref()
+                            .unwrap_or(&"".to_string()),
+                        operation_id.to_string()
+                    ),
+                    url: url.to_string(),
+                    request_schema_name: request_type.0,
+                    // 可作为调用方法的参数类型， 已经处理是否可选
+                    request_type_name: request_type.1,
+                    // content_type: String::from("application/json"),
+                    response_type_name: open_3_get_response_type_name(&api_config, command_config),
+                    is_form: api_config.parameters.is_some() && method.eq("post"),
+                };
+                all_api_list.push((module.to_string(), open_api_requester.clone()));
                 // 如果已经指定了tag， 则忽略其他tag
                 if !command_config.tags.is_empty() {
                     if !command_config.tags.contains(&module) {
                         continue;
                     }
                 }
-                api_list.push((
-                    module.to_string(),
-                    OpenApiRequester {
-                        summary: if let Some(summary) = &api_config.summary {
-                            summary.to_string()
-                        } else {
-                            String::new()
-                        },
-                        method: method.clone(),
-                        operation_id: format!(
-                            "{}{}",
-                            command_config
-                                .operation_prefix
-                                .as_ref()
-                                .unwrap_or(&"".to_string()),
-                            operation_id.to_string()
-                        ),
-                        url: url.to_string(),
-                        request_schema_name: request_type.0,
-                        // 可作为调用方法的参数类型， 已经处理是否可选
-                        request_type_name: request_type.1,
-                        // content_type: String::from("application/json"),
-                        response_type_name: open_3_get_response_type_name(
-                            &api_config,
-                            command_config,
-                        ),
-                        is_form: api_config.parameters.is_some() && method.eq("post"),
-                    },
-                ))
+                api_list.push((module.to_string(), open_api_requester));
             }
         }
     }
-    api_list
+    (api_list, all_api_list)
 }
 
 /// 获取响应类型名称
