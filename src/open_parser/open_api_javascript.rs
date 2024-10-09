@@ -392,7 +392,7 @@ fn get_schema_name_from_schema_ref(schema_ref: &str) -> String {
 /// 则返回 ResultUser
 fn open_3_get_type_name_from_schema_ref(schema_ref: &str) -> String {
     lazy_static! {
-        static ref SCHEMA_TYPE_NAME_REGEX: Regex = Regex::new(r"[«»]").unwrap();
+        static ref SCHEMA_TYPE_NAME_REGEX: Regex = Regex::new(r"[«»,]").unwrap();
     }
     let schema_name = get_schema_name_from_schema_ref(schema_ref);
     SCHEMA_TYPE_NAME_REGEX
