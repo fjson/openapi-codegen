@@ -18,7 +18,7 @@ use std::{
 /// 生成 open api typescript调用
 pub fn create_typescript_api(
     command_config: &CommandConfig,
-    open_api_parser: &impl OpenApiJavaScriptParser,
+    open_api_parser: &mut impl OpenApiJavaScriptParser,
 ) {
     init_workspace(command_config);
     create_default_resource_file(command_config);
@@ -301,7 +301,7 @@ fn create_api_import(command_config: &CommandConfig) -> String {
 }
 
 /// 生成typescript类型文件
-fn create_ts_d_ts(command_config: &CommandConfig, open_api_parser: &impl OpenApiJavaScriptParser) {
+fn create_ts_d_ts(command_config: &CommandConfig, open_api_parser: &mut impl OpenApiJavaScriptParser) {
     info!("create api.d.ts");
     let workspace_path = Path::new(&command_config.workspace);
     let mut ts_d_f = OpenOptions::new()

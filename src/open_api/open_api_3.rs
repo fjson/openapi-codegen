@@ -141,7 +141,7 @@ pub struct Open3Components {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Open3ComponentsSchema {
-    pub title: String,
+    pub title: Option<String>,
 
     #[serde(alias = "type")]
     pub schema_type: String,

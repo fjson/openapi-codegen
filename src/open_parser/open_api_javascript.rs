@@ -20,7 +20,7 @@ pub trait OpenApiJavaScriptParser {
     fn get_api_list(&self) -> &Vec<(String, OpenApiRequester)>;
 
     /// 获取所有类型列表
-    fn get_interface_enum_list(&self, ignore_option: &bool) -> Vec<String>;
+    fn get_interface_enum_list(&mut self, ignore_option: &bool) -> Vec<String>;
 }
 
 pub struct OpenApi3JavaScript<'a, 'b> {
@@ -70,9 +70,15 @@ impl OpenApiJavaScriptParser for OpenApi3JavaScript<'_, '_> {
     }
 
     /// 获取所有的接口列表
-    fn get_interface_enum_list(&self, ignore_option: &bool) -> Vec<String> {
+    fn get_interface_enum_list(&mut self, ignore_option: &bool) -> Vec<String> {
         let mut str_vec = vec![];
-
+        let schemas = &mut self.config.components.schemas;
+        // 当schema Info钟没有title时 将key作为title
+        for (key, schema) in schemas.iter_mut() {
+            if schema.title.is_none() {
+                schema.title = Some(key.to_string())
+            }
+        }
         let mut components_schema_vec: Vec<(&String, &Open3ComponentsSchema)> =
             self.config.components.schemas.iter().collect();
         components_schema_vec.sort_by(|a, b| a.0.cmp(&b.0));
@@ -279,7 +285,7 @@ fn generate_get_request_type(
         return (String::from("void"), String::from("void"));
     }
     let components_schema = Open3ComponentsSchema {
-        title: type_name.clone(),
+        title: Some(type_name.clone()),
         schema_type: "object".to_string(),
         properties: Some(properties),
         required: Some(required_vec),
@@ -420,7 +426,7 @@ fn open_3_create_ts_interface_enum(
     namespace: &Option<String>,
     ignore_option: &bool,
 ) -> String {
-    let interface_name = open_3_get_type_name_from_schema_ref(&components_schema.title);
+    let interface_name = open_3_get_type_name_from_schema_ref(components_schema.title.as_ref().unwrap());
     let mut interface_str = format!("interface {} {{", &interface_name);
     let mut open_api_schema_vec: Vec<(&String, &Open3Schema)> =
         if let Some(properties) = &components_schema.properties {
