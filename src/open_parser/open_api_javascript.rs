@@ -267,11 +267,8 @@ fn generate_get_request_type(
                 v.name.clone(),
                 Open3Schema {
                     schema_type: Some("string".to_string()),
-                    schema_ref: None,
-                    items: None,
-                    property_enum: None,
-                    format: None,
                     description: v.description.clone(),
+                    ..Default::default()
                 },
             );
             if v.required {
@@ -303,38 +300,66 @@ fn generate_get_request_type(
 
 /// 获取post请求的请求类型
 fn generate_post_request_type(
-    components: &Open3Components,
+    components: &mut Open3Components,
     api_config: &Open3ApiConfig,
     command_config: &CommandConfig,
 ) -> (String, String) {
-    if let Some(schema_ref) = api_config
+    let application_json = api_config
         .request_body
         .as_ref()
-        .and_then(|x| x.content.get("application/json"))
-        .and_then(|x| x.schema.schema_ref.as_ref())
-    {
-        let is_required = open_3_schema_is_required(components, schema_ref);
-        let type_name = open_3_get_type_name_from_schema_ref(schema_ref);
-        // 如果指定namespace 则需要在类型前添加namespace.
-        let type_name = if let Some(namespace) = &command_config.namespace {
-            format!("{}.{}", namespace, type_name)
-        } else {
-            type_name
-        };
-        let mut type_name_clone = type_name.clone();
-        if !type_name.eq("void") {
-            return (
-                type_name,
-                if !is_required {
-                    type_name_clone.push_str(" | void");
-                    type_name_clone
-                } else {
-                    type_name_clone
-                },
-            );
+        .and_then(|x| x.content.get("application/json"));
+    if let Some(schema_ref) = application_json.and_then(|x| x.schema.schema_ref.as_ref()) {
+        if let Some(type_res) = generate_type(&schema_ref, components, command_config) {
+            return type_res;
+        }
+    }
+    if let Some(properties) = application_json.and_then(|v| v.schema.properties.clone()) {
+        if let Some(schema) = application_json.and_then(|v| Some(v.schema.clone())) {
+            // 存在匿名的schema 将schema塞进components
+            let type_name = format!("{}Params", capitalize(&api_config.operation_id));
+            let components_schema = Open3ComponentsSchema {
+                title: Some(type_name.clone()),
+                schema_type: schema.schema_type.unwrap(),
+                properties: Some(properties),
+                required: schema.required,
+            };
+            components
+                .schemas
+                .insert(type_name.clone(), components_schema);
+            if let Some(type_res) = generate_type(&type_name, components, command_config) {
+                return type_res;
+            }
         }
     }
     (String::from("void"), String::from("void"))
+}
+
+fn generate_type(
+    schema_ref: &str,
+    components: &mut Open3Components,
+    command_config: &CommandConfig,
+) -> Option<(String, String)> {
+    let is_required = open_3_schema_is_required(components, schema_ref);
+    let type_name = open_3_get_type_name_from_schema_ref(schema_ref);
+    // 如果指定namespace 则需要在类型前添加namespace.
+    let type_name = if let Some(namespace) = &command_config.namespace {
+        format!("{}.{}", namespace, type_name)
+    } else {
+        type_name
+    };
+    let mut type_name_clone = type_name.clone();
+    if !type_name.eq("void") {
+        return Some((
+            type_name,
+            if !is_required {
+                type_name_clone.push_str(" | void");
+                type_name_clone
+            } else {
+                type_name_clone
+            },
+        ));
+    }
+    None
 }
 
 /// 根据schema生成响应类型名称
@@ -426,7 +451,8 @@ fn open_3_create_ts_interface_enum(
     namespace: &Option<String>,
     ignore_option: &bool,
 ) -> String {
-    let interface_name = open_3_get_type_name_from_schema_ref(components_schema.title.as_ref().unwrap());
+    let interface_name =
+        open_3_get_type_name_from_schema_ref(components_schema.title.as_ref().unwrap());
     let mut interface_str = format!("interface {} {{", &interface_name);
     let mut open_api_schema_vec: Vec<(&String, &Open3Schema)> =
         if let Some(properties) = &components_schema.properties {

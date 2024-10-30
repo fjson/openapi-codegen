@@ -108,7 +108,7 @@ pub struct Open3ResponseContent {
     pub schema: Open3Schema,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Open3Schema {
     #[serde(alias = "$ref")]
     pub schema_ref: Option<String>,
@@ -124,6 +124,12 @@ pub struct Open3Schema {
     pub format: Option<String>,
 
     pub description: Option<String>,
+
+    pub title: Option<String>,
+
+    pub properties: Option<HashMap<String, Open3Schema>>,
+
+    pub required: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
