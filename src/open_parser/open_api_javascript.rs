@@ -247,6 +247,8 @@ fn open_3_get_request_type_name(
 }
 
 /// 生成get请求的请求类型并塞进components
+/// 
+/// 类型被统一成了string
 fn generate_get_request_type(
     components: &mut Open3Components,
     api_config: &Open3ApiConfig,
