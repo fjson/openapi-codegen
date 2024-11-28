@@ -247,7 +247,7 @@ fn open_3_get_request_type_name(
 }
 
 /// 生成get请求的请求类型并塞进components
-/// 
+///
 /// 类型被统一成了string
 fn generate_get_request_type(
     components: &mut Open3Components,
@@ -391,11 +391,16 @@ fn open_3_get_type_name_from_schema(
     }
     if let Some(schema_type) = &schema.schema_type {
         if schema_type.eq("array") {
-            return open_3_get_type_name_from_schema(
-                schema.items.as_ref().unwrap(),
-                namespace,
-                "Array<T>",
-            );
+            let g = {
+                if generic.is_empty() {
+                    "Array<T>".to_string()
+                } else {
+                    SCHEMA_GENERIC_REGEX
+                        .replace_all(generic, format!("<{}>", "Array<T>"))
+                        .to_string()
+                }
+            };
+            return open_3_get_type_name_from_schema(schema.items.as_ref().unwrap(), namespace, &g);
         }
         let translate_type = ts_type_transform(&schema_type.clone());
         if generic.is_empty() {
