@@ -202,6 +202,7 @@ fn open_3_get_response_type_name(
     api_config: &Open3ApiConfig,
     command_config: &CommandConfig,
 ) -> String {
+    let mut res_type = None;
     if let Some(response_content_map) = api_config
         .responses
         .get("200")
@@ -210,15 +211,21 @@ fn open_3_get_response_type_name(
         for (_, response_content) in response_content_map {
             if let Some(response_content) = response_content {
                 let schema = &response_content.schema;
-                return open_3_get_type_name_from_schema(
+                res_type = Some(open_3_get_type_name_from_schema(
                     schema,
                     command_config.namespace.clone(),
                     "",
-                );
+                ));
             }
         }
     }
-    String::from("void")
+    // 支持传入一个包装层 对response类型进行包装
+    if let Some(wrap) = &command_config.wrap {
+        if let Some(res_t) = res_type {
+            res_type = Some(format!("{wrap}<{res_t}>"));
+        }
+    }
+    res_type.get_or_insert("void".into()).clone()
 }
 
 /// 获取请求参数类型名称
@@ -430,7 +437,7 @@ fn get_schema_name_from_schema_ref(schema_ref: &str) -> String {
 /// 则返回 ResultUser
 fn open_3_get_type_name_from_schema_ref(schema_ref: &str) -> String {
     lazy_static! {
-        static ref SCHEMA_TYPE_NAME_REGEX: Regex = Regex::new(r"[«»,]").unwrap();
+        static ref SCHEMA_TYPE_NAME_REGEX: Regex = Regex::new(r"[«»,-]").unwrap();
     }
     let schema_name = get_schema_name_from_schema_ref(schema_ref);
     SCHEMA_TYPE_NAME_REGEX

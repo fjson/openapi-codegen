@@ -12,6 +12,7 @@ pub struct CommandConfig {
     pub tags: Vec<String>,
     pub operation_prefix: Option<String>,
     pub namespace: Option<String>,
+    pub wrap: Option<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -40,6 +41,10 @@ struct Args {
     /// namespace
     #[arg(long)]
     namespace: Option<String>,
+
+    /// wrap response
+    #[arg(long)]
+    wrap: Option<String>,
 }
 
 pub fn get_command_config() -> CommandConfig {
@@ -82,6 +87,11 @@ pub fn get_command_config() -> CommandConfig {
             None
         }else {
             Some(capitalize(&operation_prefix).to_string())
-        }
+        },
+        wrap: if let Some(wrap) = args.wrap {
+            Some(wrap.trim().into())
+        }else {
+           None
+        },
     }
 }
