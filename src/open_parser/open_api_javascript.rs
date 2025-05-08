@@ -501,13 +501,13 @@ fn open_3_create_ts_interface_enum(
             ""
         };
         let interface_item = format!(
-            r"
+            r#"
   /**
    * {description}
    * @type {schema_type}
    * @memberof {interface_name}
    */
-  {property_name}{property_option_split}: {schema_type};"
+  "{property_name}"{property_option_split}: {schema_type};"#
         );
         interface_str.push_str(&interface_item);
     }
