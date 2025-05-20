@@ -1,23 +1,25 @@
-## ！！！适用于OpenApi 3
+## OpenAPI 3 Support
 
-### 支持情况
+### Supported Features
 
-目前仅支持swagger3(OpenApi3), 支持的请求类型 get post delete put
+Currently supports only Swagger 3 (OpenAPI 3). Supported HTTP methods: `GET`, `POST`, `DELETE`, `PUT`.
 
-### 开发环境
+### Development Environment
 
-- rustc: 1.67.0
-- system: windows,linux,mac
-- runtime: windows,linux,mac
+- **Rustc:** 1.67.0
+- **Supported Systems:** Windows, Linux, macOS
+- **Runtime:** Windows, Linux, macOS
 
-### openapi-codegen
+### openapi-codegen CLI Options
 
-- -c required open api config url(json)
-- -o required output dir
-- -s split module file
-- -i ignore response field option
-- --tags special tag(split with ,)
+- `-c` **(required)**: OpenAPI config URL (JSON)
+- `-o` **(required)**: Output directory
+- `-s` *(optional)*: Split module files
+- `-i` *(optional)*: Ignore response field option
+- `--tags` *(optional)*: Specify tags (comma-separated)
+- `--wrap` *(optional)*: Add a wrapper type to response, e.g., `Wrap<Response>`
+- `--namespace` *(optional)*: Add a namespace
 
 ```bash
-open-api-codegen -c <json config url> -o <output dir> -s <split file> -i <ignore option> --tags <tag>
+open-api-codegen -c <json config url> -o <output dir> -s <split file> -i <ignore option> --tags <tag> --wrap <type name> --namespace <namespace>
 ```
