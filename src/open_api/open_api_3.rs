@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Open3Config {
@@ -119,7 +120,7 @@ pub struct Open3Schema {
     pub items: Option<Box<Open3Schema>>,
 
     #[serde(alias = "enum")]
-    pub property_enum: Option<Vec<String>>,
+    pub property_enum: Option<Vec<Value>>,
 
     pub format: Option<String>,
 
